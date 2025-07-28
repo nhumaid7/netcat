@@ -1,74 +1,118 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net"
-	//"os"
-	"bufio"
+	"os"
+	"strings"
+	"sync"
+	"time"
+)
+
+var (
+	clients = make(map[net.Conn]string)
+	channel = make(chan string, 10)
+	mu      sync.Mutex
 )
 
 func main() {
+	var port string
+	if len(os.Args) < 2 {
+		port = ":8989"
+	} else {
+		port = ":" + os.Args[1]
+	}
 
-	// var port string
-	// if len(os.Args) == 1 {
-	// 	fmt.Print("listinging on port : 9000")
-	// } else if len(os.Args) == 2 {
-	// 	port = os.Args[1]
-	// 	fmt.Sprint("listinging on port :%s", port)
-	// }
-	ln, err := net.Listen("tcp", "localhost:9000")
-
+	ln, err := net.Listen("tcp", port)
 	if err != nil {
 		panic(err)
 	}
 	defer ln.Close()
 
-	fmt.Printf("listining on %s\n", ln.Addr())
+	fmt.Printf("Listening on %s\n", ln.Addr())
+
+	go broadcaster()
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			fmt.Println("err accepting ", err)
+			fmt.Println("Error accepting connection:", err)
 			continue
 		}
-		conn.Close()
-		io.WriteString(conn, fmt.Sprintf("hello from %s\n", conn.RemoteAddr()))
 
-		// fmt.Println(string(bs))
-
-		go handelConnetion(conn)
+		go handleConnection(conn)
 	}
 }
 
-func handelConnetion(conn net.Conn) {
-	defer conn.Close()
-
+func handleConnection(conn net.Conn) {
 	reader := bufio.NewReader(conn)
+
+	conn.Write([]byte(`Welcome to TCP-Chat!
+         _nnnn_
+        dGGGGMMb
+       @p~qp~~qMb
+       M|@||@) M|
+       @,----.JM|
+      JS^\__/  qKL
+     dZP        qKRb
+    dZP          qKKb
+   fZP            SMMb
+   HZM            MMMM
+   FqM            MMMM
+ __| ".        |\dS"qML
+ |    `.       | `' \Zq
+_)      \.___.,|     .'
+\____   )MMMMMP|   .'
+     `-'       `--'
+[ENTER YOUR NAME]: `))
+
+	clientName, _ := reader.ReadString('\n')
+	cName := strings.TrimSpace(clientName)
+
+	// Add to client list
+	mu.Lock()
+	clients[conn] = cName
+	mu.Unlock()
+
+	joinMsg := fmt.Sprintf("%s has joined our chat...\n", cName)
+	channel <- joinMsg
 
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("failed to read from client: connection closed")
+				leaveMsg := fmt.Sprintf("%s has left our chat...\n", cName)
+				fmt.Print(leaveMsg)
+				mu.Lock()
+				delete(clients, conn)
+				mu.Unlock()
+				channel <- leaveMsg
+				conn.Close()
+				return
+			} else {
+				fmt.Println("Error reading from client:", err)
 				return
 			}
-			return
 		}
 
-		fmt.Printf("received: %s", line)
+		echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, line)
+		channel <- echo
+	}
+}
 
-		echo := fmt.Sprintf("echo: %s", line)
-
-		fmt.Printf("response: %s", echo)
-
-		_, err = conn.Write([]byte(echo))
-		if err != nil {
-			fmt.Println("failed to write to client:", err)
-			return
+func broadcaster() {
+	for msg := range channel {
+		mu.Lock()
+		for conn := range clients {
+			_, err := conn.Write([]byte(msg))
+			if err != nil {
+				fmt.Println("Broadcast error:", err)
+				conn.Close()
+				delete(clients, conn)
+			}
 		}
-		fmt.Printf("sent: %s", echo)
-		// Read the data from the connection
-
+		mu.Unlock()
 	}
 }
