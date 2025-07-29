@@ -15,6 +15,7 @@ var (
 	clients = make(map[net.Conn]string)
 	channel = make(chan string, 10)
 	mu      sync.Mutex
+	history  = make([]string, 0, 100) 
 )
 
 func main() {
@@ -49,7 +50,7 @@ func main() {
 func handleConnection(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 
-	conn.Write([]byte(`Welcome to TCP-Chat!
+	fmt.Println([]byte("Welcome to TCP-Chat!
          _nnnn_
         dGGGGMMb
        @p~qp~~qMb
@@ -66,7 +67,7 @@ func handleConnection(conn net.Conn) {
 _)      \.___.,|     .'
 \____   )MMMMMP|   .'
      `-'       `--'
-[ENTER YOUR NAME]: `))
+[ENTER YOUR NAME]: "))
 
 	clientName, _ := reader.ReadString('\n')
 	cName := strings.TrimSpace(clientName)
@@ -98,7 +99,17 @@ _)      \.___.,|     .'
 		}
 
 		echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, line)
-		channel <- echo
+		// Store message in history
+		mu.Lock()
+		if len(history) >= 100 {
+			history = history[1:] // Remove oldest message
+			history = append(history, echo)
+		} else {
+			history = append(history, echo)
+		}
+		mu.Unlock()
+
+		channel <- history
 	}
 }
 
@@ -107,6 +118,8 @@ func broadcaster() {
 		mu.Lock()
 		for conn := range clients {
 			_, err := conn.Write([]byte(msg))
+
+
 			if err != nil {
 				fmt.Println("Broadcast error:", err)
 				conn.Close()
