@@ -25,8 +25,11 @@ func main() {
 	var port string
 	if len(os.Args) < 2 {
 		port = ":8989"
-	} else {
+	} else if len(os.Args) == 2 {
 		port = ":" + os.Args[1]
+	} else{
+		fmt.Println("Usage: go run main.go [port]")
+		return
 	}
 
 	ln, err := net.Listen("tcp", port)
@@ -53,12 +56,12 @@ func main() {
 func handleConnection(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 
-welcome, err := os.ReadFile("welcome.txt")
+	welcome, err := os.ReadFile("welcome.txt")
 	if err != nil {
 		fmt.Println("Reading welcome file error:", err)
 		return
 	}
-	conn.Write([]byte(string(len(clients))))
+	// conn.Write([]byte(fmt.Sprintf("Connected users: %d\n", len(clients))))
 	conn.Write(welcome)
 
 
@@ -70,6 +73,7 @@ welcome, err := os.ReadFile("welcome.txt")
 	if len(clients)<clientNum{
 		mu.Lock()
 		clients[conn] = cName
+		
 		mu.Unlock()
 	}else{
 		fmt.Print("cannot add u to the server, try again later")
@@ -78,7 +82,7 @@ welcome, err := os.ReadFile("welcome.txt")
 	
 
 	joinMsg := fmt.Sprintf("%s has joined our chat...\n", cName)
-	channel <- joinMsg
+		channel <- joinMsg
 	r:=strings.Join(history, " ")
 	conn.Write([]byte(r))
 
