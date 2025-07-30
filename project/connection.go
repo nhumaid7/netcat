@@ -8,10 +8,9 @@ import (
 	"os"
 	"strings"
 	"time"
-	"sync"
 )
 
-func handleConnection(conn net.Conn, clients map[net.Conn]string,channel chan string, mu sync.Mutex, history []string) {
+func handleConnection(conn net.Conn, server *Server) {
 	reader := bufio.NewReader(conn)
 
 	welcome, err := os.ReadFile("welcome.txt")
@@ -26,22 +25,21 @@ func handleConnection(conn net.Conn, clients map[net.Conn]string,channel chan st
 	cName := strings.TrimSpace(clientName)
 
 	// Add to client list
-	mu.Lock()
-	defer mu.Unlock()
-	 
-	if len(clients) >= 10 {
-		
+	server.mu.Lock()
+
+	if len(server.clients) >= 10 {
+		server.mu.Unlock()
 		fmt.Print("cannot add u to the server, try again later")
 		conn.Close()
 		return
 	}else{
-		clients[conn] = cName
-		mu.Unlock()
+		server.clients[conn] = cName
+		server.mu.Unlock()
 	}
 
 	joinMsg := fmt.Sprintf("%s has joined our chat...\n", cName)
-	channel <- joinMsg
-	r := strings.Join(history, " ")
+	server.channel <- joinMsg
+	r := strings.Join(server.history, " ")
 	conn.Write([]byte(r))
 
 	for {
@@ -51,10 +49,10 @@ func handleConnection(conn net.Conn, clients map[net.Conn]string,channel chan st
 				leaveMsg := fmt.Sprintf("%s has left our chat...\n", cName)
 				// history=append(history, leaveMsg)
 				fmt.Print(leaveMsg)
-				mu.Lock()
-				delete(clients, conn)
-				mu.Unlock()
-				channel <- leaveMsg
+				server.mu.Lock()
+				delete(server.clients, conn)
+				server.mu.Unlock()
+				server.channel <- leaveMsg
 				conn.Close()
 				return
 			} else {
@@ -64,7 +62,10 @@ func handleConnection(conn net.Conn, clients map[net.Conn]string,channel chan st
 		}
 
 		echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, line)
-		channel <- echo
-		history = append(history, echo)
+		server.channel <- echo
+		server.mu.Lock()
+		server.history = append(server.history, echo)
+		server.mu.Unlock()
+
 	}
 }

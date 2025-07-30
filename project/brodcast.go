@@ -2,22 +2,20 @@ package project
 
 import (
 	"fmt"
-	"net"
-	"sync"
 
 )
 
-func broadcaster(clients map[net.Conn]string, channel chan string, mu sync.Mutex) {
-	for msg := range channel {
-		mu.Lock()
-		for conn := range clients {
+func broadcaster(server *Server) {
+	for msg := range server.channel {
+		server.mu.Lock()
+		for conn := range server.clients {
 			_, err := conn.Write([]byte(msg))
 			if err != nil {
 				fmt.Println("Broadcast error:", err)
 				conn.Close()
-				delete(clients, conn)
+				delete(server.clients, conn)
 			}
 		}
-		mu.Unlock()
+		server.mu.Unlock()
 	}
 }

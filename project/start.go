@@ -18,7 +18,7 @@ type Server struct {
 	
 func Start(port string){
 
-	serve:= &Server{
+	server := &Server{
 		port : port,
 		clients : make(map[net.Conn]string, 10),
 		channel : make(chan string),
@@ -35,7 +35,7 @@ func Start(port string){
 
 	fmt.Printf("Listening on %s\n", ln.Addr())
 
-	go broadcaster(serve.clients, serve.channel, serve.mu)
+	go broadcaster(server)
 
 	for {
 		conn, err := ln.Accept()
@@ -44,6 +44,6 @@ func Start(port string){
 			continue
 		}
 
-		go handleConnection(conn, serve.clients, serve.channel, serve.mu, serve.history)
+		go handleConnection(conn , server)
 	}
 }
