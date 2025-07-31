@@ -19,9 +19,17 @@ func handleConnection(conn net.Conn, server *Server) {
 		return
 	}
 	// conn.Write([]byte(fmt.Sprintf("Connected users: %d\n", len(clients))))
-	conn.Write(welcome)
+	 _, err = conn.Write(welcome)
+    if err != nil {
+        fmt.Println("Error writing welcome message:", err)
+        return
+    }
 
 	clientName, _ := reader.ReadString('\n')
+	 	if err != nil {
+    fmt.Println("Error reading client name:", err)
+    return
+	}
 	cName := strings.TrimSpace(clientName)
 
 	// Add to client list
@@ -29,26 +37,32 @@ func handleConnection(conn net.Conn, server *Server) {
 
 	if len(server.clients) >= 10 {
 		server.mu.Unlock()
-		fmt.Print("cannot add u to the server, try again later")
+		// conn.Write("cannot add u to the server, try again later")
 		conn.Close()
 		return
 	}else{
 		server.clients[conn] = cName
+		
 		server.mu.Unlock()
 	}
+	
 
 	joinMsg := fmt.Sprintf("%s has joined our chat...\n", cName)
 	server.channel <- joinMsg
+	
 	r := strings.Join(server.history, " ")
 	conn.Write([]byte(r))
+    
 
 	for {
+		
 		line, err := reader.ReadString('\n')
+		
 		if err != nil {
 			if err == io.EOF {
 				leaveMsg := fmt.Sprintf("%s has left our chat...\n", cName)
 				// history=append(history, leaveMsg)
-				fmt.Print(leaveMsg)
+				// fmt.Print(leaveMsg)
 				server.mu.Lock()
 				delete(server.clients, conn)
 				server.mu.Unlock()
@@ -56,12 +70,15 @@ func handleConnection(conn net.Conn, server *Server) {
 				conn.Close()
 				return
 			} else {
+				
 				fmt.Println("Error reading from client:", err)
 				return
 			}
 		}
+		echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, line )
 
-		echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, line)
+		// echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, line )
+	
 		server.channel <- echo
 		server.mu.Lock()
 		server.history = append(server.history, echo)
