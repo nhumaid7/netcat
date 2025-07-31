@@ -18,21 +18,34 @@ func handleConnection(conn net.Conn, server *Server) {
 		fmt.Println("Reading welcome file error:", err)
 		return
 	}
-	// conn.Write([]byte(fmt.Sprintf("Connected users: %d\n", len(clients))))
+
 	 _, err = conn.Write(welcome)
     if err != nil {
         fmt.Println("Error writing welcome message:", err)
         return
     }
 
-	clientName, _ := reader.ReadString('\n')
+	clientName, err := reader.ReadString('\n')
 	 	if err != nil {
     fmt.Println("Error reading client name:", err)
     return
 	}
 	cName := strings.TrimSpace(clientName)
+	if cName == "" {
+		cName = "Anonymous"
+	}
 
-	// Add to client list
+	// Check if client name already exists
+	// server.mu.Lock()
+	// if _, exists := server.clients[conn]; exists {
+	// 	server.mu.Unlock()
+	// 	conn.Write([]byte("Client name already exists, please choose a different name.\n"))
+	// 	conn.Close()
+	// 	return
+	// }
+	// server.mu.Unlock()
+
+	
 	server.mu.Lock()
 
 	if len(server.clients) >= 10 {
@@ -55,7 +68,10 @@ func handleConnection(conn net.Conn, server *Server) {
     
 
 	for {
-		
+
+		fixed:= fmt.Sprintf("[%s][%s]: ", time.Now().Format("2006-01-02 15:04:05"), cName)
+		conn.Write([]byte(fixed))
+
 		line, err := reader.ReadString('\n')
 		
 		if err != nil {
@@ -75,9 +91,8 @@ func handleConnection(conn net.Conn, server *Server) {
 				return
 			}
 		}
+		
 		echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, line )
-
-		// echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, line )
 	
 		server.channel <- echo
 		server.mu.Lock()

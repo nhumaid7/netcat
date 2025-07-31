@@ -2,12 +2,16 @@ package project
 
 import (
 	"fmt"
-
 )
 
 func broadcaster(server *Server) {
 	for msg := range server.channel {
+
 		server.mu.Lock()
+		if msg == ""{
+			server.mu.Unlock()
+			continue
+		}
 		for conn := range server.clients {
 			_, err := conn.Write([]byte(msg))
 			if err != nil {
