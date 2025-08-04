@@ -27,23 +27,26 @@ func handleConnection(conn net.Conn, server *Server) {
 
 	clientName, err := reader.ReadString('\n')
 	 	if err != nil {
-    fmt.Println("Error reading client name:", err)
-    return
-	}
+		fmt.Println("Error reading client name:", err)
+		return
+		}
 	cName := strings.TrimSpace(clientName)
 	if cName == "" {
 		cName = "Anonymous"
 	}
 
 	// Check if client name already exists
-	// server.mu.Lock()
-	// if _, exists := server.clients[conn]; exists {
-	// 	server.mu.Unlock()
-	// 	conn.Write([]byte("Client name already exists, please choose a different name.\n"))
-	// 	conn.Close()
-	// 	return
-	// }
-	// server.mu.Unlock()
+	server.mu.Lock()
+	for _, name := range server.clients {
+		if name == cName {
+			server.mu.Unlock()
+			conn.Write([]byte("Client name already exists, please choose a different name.\n"))
+			conn.Close()
+			return
+		}
+	}
+	server.mu.Unlock()
+
 
 	
 	server.mu.Lock()
@@ -68,9 +71,6 @@ func handleConnection(conn net.Conn, server *Server) {
     
 
 	for {
-
-		fixed:= fmt.Sprintf("[%s][%s]: ", time.Now().Format("2006-01-02 15:04:05"), cName)
-		conn.Write([]byte(fixed))
 
 		line, err := reader.ReadString('\n')
 		

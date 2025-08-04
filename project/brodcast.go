@@ -12,6 +12,7 @@ func broadcaster(server *Server) {
 			server.mu.Unlock()
 			continue
 		}
+		
 		for conn := range server.clients {
 			_, err := conn.Write([]byte(msg))
 			if err != nil {
