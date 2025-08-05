@@ -8,7 +8,7 @@ func broadcaster(server *Server) {
 	for msg := range server.channel {
 
 		server.mu.Lock()
-		if msg == ""{
+		if msg == "" {
 			server.mu.Unlock()
 			continue
 		}

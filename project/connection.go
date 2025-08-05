@@ -13,91 +13,105 @@ import (
 func handleConnection(conn net.Conn, server *Server) {
 	reader := bufio.NewReader(conn)
 
-	welcome, err := os.ReadFile("welcome.txt")
-	if err != nil {
-		fmt.Println("Reading welcome file error:", err)
-		return
-	}
-
-	 _, err = conn.Write(welcome)
-    if err != nil {
-        fmt.Println("Error writing welcome message:", err)
-        return
-    }
-
-	clientName, err := reader.ReadString('\n')
-	 	if err != nil {
-		fmt.Println("Error reading client name:", err)
-		return
-		}
-	cName := strings.TrimSpace(clientName)
-	if cName == "" {
-		cName = "Anonymous"
-	}
-
-	// Check if client name already exists
-	server.mu.Lock()
-	for _, name := range server.clients {
-		if name == cName {
-			server.mu.Unlock()
-			conn.Write([]byte("Client name already exists, please choose a different name.\n"))
-			conn.Close()
+	var cName string
+	for {
+		welcome, err := os.ReadFile("welcome.txt")
+		if err != nil {
+			fmt.Println("Reading welcome file error:", err)
 			return
 		}
+		_, err = conn.Write(welcome)
+		if err != nil {
+			fmt.Println("Error writing welcome message:", err)
+			return
+		}
+
+		clientName, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Error reading client name:", err)
+			return
+		}
+		cName = strings.TrimSpace(clientName)
+
+		server.mu.Lock()
+
+		if cName == "" {
+			for i := 1; i <= 10; i++ {
+				Anonymous := fmt.Sprintf("Anonymous%d", i)
+				exists := false
+				for _, name := range server.clients {
+					if name == Anonymous {
+						exists = true
+						break
+					}
+				}
+				if !exists {
+					cName = Anonymous
+					break
+				}
+			}
+		}
+
+		taken := false
+		for _, name := range server.clients {
+			if name == cName {
+				taken = true
+				break
+			}
+		}
+		server.mu.Unlock()
+
+		if taken {
+			conn.Write([]byte("This name is already taken. Please choose a different name.\n"))
+			continue
+		}
+
+		break
 	}
-	server.mu.Unlock()
 
-
-	
 	server.mu.Lock()
-
 	if len(server.clients) >= 10 {
 		server.mu.Unlock()
-		// conn.Write("cannot add u to the server, try again later")
+		conn.Write([]byte("Server is full\n"))
 		conn.Close()
 		return
-	}else{
-		server.clients[conn] = cName
-		
-		server.mu.Unlock()
 	}
-	
+	server.clients[conn] = cName
+	server.mu.Unlock()
 
 	joinMsg := fmt.Sprintf("%s has joined our chat...\n", cName)
 	server.channel <- joinMsg
-	
+
 	r := strings.Join(server.history, " ")
 	conn.Write([]byte(r))
-    
 
 	for {
-
-		line, err := reader.ReadString('\n')
-		
+		msg, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
 				leaveMsg := fmt.Sprintf("%s has left our chat...\n", cName)
-				// history=append(history, leaveMsg)
-				// fmt.Print(leaveMsg)
 				server.mu.Lock()
 				delete(server.clients, conn)
 				server.mu.Unlock()
 				server.channel <- leaveMsg
 				conn.Close()
 				return
-			} else {
-				
-				fmt.Println("Error reading from client:", err)
-				return
 			}
+			fmt.Println("Error reading from client:", err)
+			return
 		}
-		
-		echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, line )
-	
+
+		emptyMsg := strings.TrimSpace(msg)
+		if emptyMsg == "" {
+			conn.Write([]byte("Empty messages are not allowed. Please write something meaningful.\n"))
+			continue
+		}
+
+		echo := fmt.Sprintf("[%s][%s]: %s", time.Now().Format("2006-01-02 15:04:05"), cName, msg)
 		server.channel <- echo
+
 		server.mu.Lock()
 		server.history = append(server.history, echo)
 		server.mu.Unlock()
-
 	}
 }
