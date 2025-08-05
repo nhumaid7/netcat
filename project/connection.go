@@ -33,6 +33,18 @@ func handleConnection(conn net.Conn, server *Server) {
 		}
 		cName = strings.TrimSpace(clientName)
 
+		invalid := false
+		for i := 0; i < len(cName); i++ {
+			if cName[i] > 127 {
+				invalid = true
+				break
+			}
+		}
+		if invalid {
+			conn.Write([]byte("Only ASCII characters are allowed in names.\n"))
+			continue
+		}
+
 		server.mu.Lock()
 
 		if cName == "" {
@@ -70,7 +82,7 @@ func handleConnection(conn net.Conn, server *Server) {
 	}
 
 	server.mu.Lock()
-	if len(server.clients) >= 10 {
+	if len(server.clients) >= 2 {
 		server.mu.Unlock()
 		conn.Write([]byte("Server is full\n"))
 		conn.Close()
@@ -104,6 +116,17 @@ func handleConnection(conn net.Conn, server *Server) {
 		emptyMsg := strings.TrimSpace(msg)
 		if emptyMsg == "" {
 			conn.Write([]byte("Empty messages are not allowed. Please write something meaningful.\n"))
+			continue
+		}
+		invalid := false
+		for i := 0; i < len(emptyMsg); i++ {
+			if emptyMsg[i] > 127 {
+				invalid = true
+				break
+			}
+		}
+		if invalid {
+			conn.Write([]byte("Only ASCII characters are allowed in messages.\n"))
 			continue
 		}
 

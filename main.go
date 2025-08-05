@@ -11,7 +11,7 @@ import (
 func main() {
 	var port string
 	if len(os.Args) < 2 {
-		port = ":9999"
+		port = ":8989"
 	} else if len(os.Args) == 2 {
 		port = ":" + os.Args[1]
 	} else{

@@ -1,0 +1,4 @@
+nc localhost 8989
+
+go build -o TCPChat 
+./TCPChat 2525
